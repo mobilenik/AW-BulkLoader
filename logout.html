@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+	<title>Citizen Center</title>
+	<meta charset='utf-8'>
+	<meta name='viewport' content='width=device-width, initial-scale=1, shrink-to-fit=no'>
+	<link rel='stylesheet' href='css/font-awesome.min.css'>
+	<link rel="stylesheet" href="css/bootstrap.css">
+	<link rel='stylesheet' href='css/accountrequest.css'>
+	<script src='js/jquery.min.js'></script>
+	<script src='js/tether.min.js'></script>
+	<script src='js/bootstrap.min.js'></script>
+	<script src='js/angular.min.js'></script>
+	<script src='js/xml2json.min.js'></script>
+	<script src='js/angular-cookies.min.js'></script>
+
+	<!-- import configuration file -->
+	<script src="config/config.js"></script>
+
+</head>
+
+<body ng-app='loginApp' ng-controller='loginController'>
+
+	<script>
+		var app = angular.module('loginApp', ['ngCookies']);
+
+		/* Controllers */
+		app.controller('loginController', ['$window', '$cookies', '$scope', '$http', function ($window, $cookies, $scope, $http) {
+
+
+			// Read application settings
+			$scope.application = application;
+			document.title = $scope.application.title;
+
+			console.log("LOGOUT");
+			// Clear all cookies
+			$cookies.remove('defaultinst_AuthContext', { path: '/', secure: true });
+			$cookies.remove('defaultinst_SAMLart', { path: '/' });
+			$cookies.remove('defaultinst_ct', { path: '/' });
+			$cookies.remove('givenName');
+			$cookies.remove('defaultinst_AuthContext', { path: '/' });
+
+			$window.location = "login.html";
+
+		}]);
+
+	</script>
+</body>
+
+</html>

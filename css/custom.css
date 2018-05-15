@@ -1,0 +1,112 @@
+.ot-text-color-navy {color:rgb(17,27,88)}
+.ot-text-color-indigo {color:rgb(46,61,152)}
+.ot-text-color-plum {color:rgb(79,54,144)}
+.ot-text-color-teal {color:rgb(0,184,186)}
+.ot-text-color-lightblue {color:rgb(9,188,239)}
+.ot-text-color-steel {color:rgb(126,146,159)}
+.ot-text-color-cloud {color:rgb(225,232,246)}
+
+.bg-ot-navy {background-color:rgb(17,27,88)!important}
+.bg-ot-indigo {background-color:rgb(46,61,152)!important}
+.bg-ot-plum {background-color:rgb(79,54,144)!important}
+.bg-ot-teal {background-color:rgb(0,184,186)!important}
+.bg-ot-lightblue {background-color:rgb(9,188,239)!important}
+.bg-ot-steel {background-color:rgb(126,146,159)!important}
+.bg-ot-cloud {background-color:rgb(225,232,246)!important}
+
+form {margin:16px 32px 16px 32px}
+.form {display:block; width:100%; height:32px; font-size:14px}
+label{padding-top:16px}
+
+/*body {padding-top:80px}*/
+
+/*body.entry{
+    /*font-family: Helvetica,Arial,sans-serif; font-size:12px;color:#363636;font-weight:bold; */
+    /*background: url('../img/background2.jpg') no-repeat center center fixed; 
+    -webkit-background-size: cover;-moz-background-size: cover;-o-background-size: cover;
+    background-size: cover;
+    /*opacity:0.93*/
+/*}*/
+
+div.msgRegister {text-align:justify}
+div.msgError {color:red; text-align:center; padding-top:8px}
+
+.fieldError{background-color:rgb(252, 130, 130)}
+.fieldOK{background-color:white}
+
+img.logo {height:79px;}
+
+.jumbotron-small {
+    padding-top:1em;
+    padding-bottom:0.25em;
+}
+
+.jumbotron-img {
+    padding-top:1em;
+    padding-bottom:0.25em;
+    background: url("../img/index_header.jpg") center center;
+    width:100%;
+    height:100%;
+    background-size: cover;
+    overflow: hidden
+}
+
+.pad-left {padding-left:16px}
+.pad-top {padding-top:10px}
+
+.service {padding:8px}
+
+.my-primary{
+    color: #E1E8F6 ;
+    background-color: #ffffff;
+    border-color: rgb(0, 114, 170);
+    border-radius: 32px;
+    color:rgb(0, 114, 170);
+}
+  
+.my-primary:focus, .my-primary:hover, .my-primary:active{
+background-color: #ffffff;
+border-color: rgb(0, 114, 170);
+}
+
+.my-thead {
+    color: white;
+    background-color: #2E3E98;
+    border-color: #2E3E98!important
+}
+
+.icon-show {
+    display:block;
+}
+
+.success {
+    background-color:rgb(166, 230, 166);
+}
+
+.fail {
+    background-color:rgb(255, 188, 188);
+}
+
+.rel-fail {
+    background-color:rgb(255, 188, 188)!important;
+}
+.skip {
+    background-color:rgb(255, 242, 168);
+}
+
+.col_id {
+    width:24px;
+}
+
+.font-light {
+    font-weight:200;
+    color:white!important
+}
+
+.scrollme {
+    overflow-y: auto;
+}
+
+.entity-title {
+     margin: 0px 1px 0px 1px;   
+}

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>Citizen Center</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<link rel="stylesheet" href="css/font-awesome.min.css">
+	<link rel="stylesheet" href="css/bootstrap.css">
+	<link rel="stylesheet" href="css/custom.css">
+	<script src="js/jquery.min.js"></script>
+	<script src="js/tether.min.js"></script>
+	<script src="js/bootstrap.min.js"></script>
+	<script src="js/angular.min.js"></script>
+	<script src="js/xml2json.min.js"></script>
+	<script src="js/angular-cookies.min.js"></script>
+
+	<!-- import configuration file -->
+	<script src="config/config.js"></script>
+
+</head>
+
+<body ng-app="listsApp" ng-controller="listsController">
+
+	<!-- Replaces with navigation, passing login cookie t/f value -->
+	<my-navigation cookie="{{cookieExists}}"></my-navigation>
+	<br/>
+
+	<br/>
+	<div class="container">
+		<div class="row">
+			<div class="col-xs-6 col-md-4">
+				<h5>Lists</h5>
+				<hr/>
+				<div ng-repeat="item in items">
+					<button id="{{item.id}}" class="btn bg-ot-cloud btn-block btn-sm" ng-click="getDetails(item.id)">{{item.name}}</button>
+					<div class="small mb-1 text-center">{{item.id}}</div>
+				</div>
+			</div>
+			<div class="col-xs-6 col-md-8">
+				<h5>Selected List Items</h5>
+				<hr/>
+				<div ng-repeat="result in results">
+					<div id="{{result.TaskIdentity.TASK_INSTANCE_ID}}{{result.Identity.Id}}" class="mb-1">
+						<button class="btn btn-light btn-block btn-sm" data-toggle="collapse" data-target="#collapse{{result.Identity.Id}}{{result.TaskIdentity.TASK_INSTANCE_ID}}"
+						 aria-expanded="false" aria-controls="collapse{{result.Identity.Id}}{{result.TaskIdentity.TASK_INSTANCE_ID}}">
+							<div class="pull-left">{{result.Title.Title}}{{result.Properties.Name}}{{result.Task.Subject}}{{result.Properties.DisplayName}}{{result.Properties.UserId}}{{result.Properties.NameGiven}}</div>
+							<div class="pull-right fa fa-arrow-down"></div>
+						</button>
+						<div class="collapse" id="collapse{{result.Identity.Id}}{{result.TaskIdentity.TASK_INSTANCE_ID}}">
+							<div class="card card-block small">
+								<pre>{{result | json}}</pre>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<my-footer></my-footer>
+
+	<script>
+		var app = angular.module('listsApp', ['ngCookies']);
+		/* Controllers */
+		app.controller("listsController", ['$cookies', '$scope', '$http', function ($cookies, $scope, $http) {
+
+			// Read application settings
+			$scope.application = application;
+			document.title = $scope.application.title;
+
+			$scope.getLists = function () {
+				$http({
+					method: 'GET',
+					// The SAMLart header is added for authentication
+					headers: { 'SAMLart': $cookies.get("defaultinst_SAMLart") },
+					url: system.base_url + '/home/system/app/entityRestService/Elements?namedFilter=View',
+				}).then(function (data) {
+					$scope.items = data.data;
+				}, function (data) {
+					console.log("FAILED TO GET PRODUCTS");
+				})
+			}
+
+			$scope.getDetails = function (id) {
+				$http({
+					method: 'GET',
+					headers: { 'SAMLart': $cookies.get("defaultinst_SAMLart") },
+					url: system.base_url + '/home/system/app/entityRestService/Elements(' + id + ')/ResultItems',
+				}).then(function (data) {
+					$scope.results = data.data.result.items;
+				}, function (data) {
+					console.log("FAILED TO GET DETAILS");
+				})
+			}
+
+			// Check for SAMLArt cookie when page loads
+			$scope.cookieExists = false;
+			if (!angular.isUndefined($cookies.get('defaultinst_SAMLart'))) {
+				$scope.cookieExists = true;
+			}
+
+			$scope.getLists();
+		}]);
+
+		// These directives include navigation and footer elements
+		app.directive('myFooter', function () {
+			return {
+				restrict: 'E',
+				templateUrl: 'incl/foot.html'
+			};
+		});
+
+		app.directive('myNavigation', function () {
+			return {
+				restrict: 'E',
+				scope: true,
+				replace: true,
+				templateUrl: 'incl/nav.html',
+				link: function (scope, elem, attrs) {
+					scope.attr = attrs;
+				}
+			};
+		});
+
+	</script>
+</body>
+
+</html>

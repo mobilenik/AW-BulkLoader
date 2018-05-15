@@ -1,0 +1,20 @@
+<!-- Navigation -->
+<div>
+	<nav class='navbar navbar-expand-md navbar-dark bg-ot-navy'>
+		<button class='navbar-toggler navbar-toggler' type='button' data-toggle='collapse' data-target='#navbar' aria-controls='navbar'
+		 aria-expanded='false' aria-label='Toggle navigation'>
+			<span class='navbar-toggler-icon'></span>
+		</button>
+		<img src="img/process_logo.png" height="24px" class="pr-4"></img>
+		<div class='collapse navbar-collapse' id='navbar'>
+				<ul class='navbar-nav mr-auto'><li>		<a class="navbar-brand mb-1 font-light">{{application.title}}</a>
+				</li>		</ul>
+						<ul class='navbar-nav navbar-right'>
+				<li class='nav-item active'>
+					<a class='nav-link {{attr.cookie=="true" ? "" : "d-none"}}' href='logout.html'>
+						<span class='fa fa-fw fa-sign-out' aria-hidden='true'></span>Logout</a>
+				</li>
+			</ul>
+		</div>
+	</nav>
+</div>

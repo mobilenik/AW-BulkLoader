@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+	<title>Citizen Center</title>
+	<meta charset='utf-8'>
+	<meta name='viewport' content='width=device-width, initial-scale=1, shrink-to-fit=no'>
+	<link rel='stylesheet' href='css/font-awesome.min.css'>
+	<link rel="stylesheet" href="css/bootstrap.css">
+	<link rel='stylesheet' href='css/custom.css'>
+	<script src='js/jquery.min.js'></script>
+	<script src='js/tether.min.js'></script>
+	<script src='js/bootstrap.min.js'></script>
+	<script src='js/angular.min.js'></script>
+	<script src='js/xml2json.min.js'></script>
+	<script src='js/angular-cookies.min.js'></script>
+
+	<!-- import configuration file -->
+	<script src="config/config.js"></script>
+
+</head>
+
+<body ng-app='loginApp' ng-controller='loginController'>
+
+	<my-navigation></my-navigation>
+	<br/>
+
+	<div class='container'>
+		<div class='row'>
+			<div class='col-xs-2 col-sm-2 col-md-3 col-lg-4'></div>
+			<div class='col-xs-8 col-sm-8 col-md-6 col-lg-4'>
+				<div class='card'>
+					<div class='card-header'>
+						<h4>Login</h4>
+					</div>
+					<div class="card-body">
+						<form name="loginForm">
+							<fieldset>
+								<label class='form' for='username'>Username</label>
+								<input ng-keydown="$event.keyCode === 13 && submitAction()" class='form' name='username' ng-model='valUsername' placeholder='enter email address'
+								 required/>
+								<label class='form' for='password'>Password</label>
+								<input ng-keydown="$event.keyCode === 13 && submitAction()" type='password' class='form' name='password' ng-model='valPassword'
+								 required/>
+								<div class="msgError" ng-model="errMessage">{{errMessage}}</div>
+							</fieldset>
+						</form>
+					</div>
+					<div class="card-footer">
+						<a class='card-link pull-left' href='reset.html'>Forgot your password?</a>
+						<button class='btn my-primary pull-right' ng-disabled='!loginForm.$valid' ng-click='submitAction()'>Submit</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class='col-xs-2 col-sm-2 col-md-3 col-lg-4'></div>
+
+	</div>
+	</div>
+	</div>
+	</div>
+
+	<script>
+
+		// To simplify authentication for demos, turn off csrf protection by adding the entries
+		// 'gateway.csrf.strict=false' and 'gateway.csrf.cookiename=' to the wcp.properties file and restart Process Suite
+		var app = angular.module('loginApp', ['ngCookies']);
+
+		/* Controllers */
+		app.controller('loginController', ['$cookies', '$scope', '$http', function ($cookies, $scope, $http) {
+
+			// Read application settings
+			$scope.application = application;
+			document.title = $scope.application.title;
+
+			// Local variables to hold session info
+			var ticketRB = '';
+			var ticket = '';
+			var samlArt = '';
+
+			$scope.valUsername = '';
+			$scope.valPassword = '';
+			$scope.submitDisabled = true;
+
+			// Clear all cookies
+			$cookies.remove(system.ps_instance + '_SAMLart', { path: '/' });
+			$cookies.remove(system.ps_instance + '_AuthContext', { path: '/' });
+			$cookies.remove(system.ps_instance + '_ct', { path: '/' });
+
+			// Login and get tickets from OTDS
+			$scope.submitAction = function () {
+
+				console.log('GETTING RB OTDS TICKET');
+				$scope.errMessage = '';
+				$http({
+					method: 'POST',
+					data: '{"userName":"' + $scope.valUsername + '", "password":"' + $scope.valPassword + '", "targetResourceId":"872d7f43-49f2-4f63-8192-58eb2881d535"}',
+					url: system.base_url + '/otdsws/rest/authentication/credentials'
+				}).then(function (data) {
+					ticketRB = data.data.ticket;
+					console.log('TICKET RB: ' + ticketRB);
+
+					// Now get the PS SAML artifact - called here because it is asynchronous
+					$scope.getSAMLArtifact();
+				}, function (data) {
+					$scope.errMessage = 'Invalid username or password';
+					console.log('FAILED TO GET OTDS TICKET:' + data);
+				})
+
+			}
+
+			// Get SAML artifact from PS for subsequent requests
+			$scope.getSAMLArtifact = function () {
+				console.log('GET SAML ARTIFACT WITH TICKET: ' + ticketRB);
+				$http({
+					method: 'POST',
+					// The data contains the ticket from OTDS
+					data: '<SOAP:Envelope xmlns:SOAP="http://schemas.xmlsoap.org/soap/envelope/"><SOAP:Header><OTAuthentication xmlns="urn:api.ecm.opentext.com">' +
+						'<AuthenticationToken>' + ticketRB + '</AuthenticationToken></OTAuthentication></SOAP:Header><SOAP:Body><samlp:Request' +
+						' xmlns:samlp="urn:oasis:names:tc:SAML:1.0:protocol" MajorVersion="1" MinorVersion="1" IssueInstant="2014-05-20T15:29:49.156Z"' +
+						' RequestID="a5470c392e-264e-9537-56ac-4397b1b416d"><samlp:AuthenticationQuery><saml:Subject xmlns:saml="urn:oasis:names:tc:SAML:1.0:assertion">' +
+						'<saml:NameIdentifier Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified"></saml:NameIdentifier></saml:Subject>' +
+						'</samlp:AuthenticationQuery></samlp:Request></SOAP:Body></SOAP:Envelope>',
+					// By default JSON is expected but this call returns XML
+					dataType: 'xml',
+					contentType: 'application/xml; charset=utf-8',
+					url: system.base_url + '/home/' + system.ps_org + '/com.eibus.web.soap.Gateway.wcp?organization=o=' + system.ps_org + ',cn=cordys,cn=' + system.ps_instance + ',o=' + system.ps_domain,
+				}).then(function (data) {
+					// Using the x2js library gives us JSON which is easier to work with
+					var x2js = new X2JS();
+					var jsonObj = x2js.xml_str2json(data.data);
+					samlArt = jsonObj.Envelope.Body.Response.AssertionArtifact;
+					$scope.saml = samlArt;
+
+					// If everything is OK, create a cookie and navigate back
+					console.log('SAML ARTIFACT:' + samlArt);
+					$cookies.put(system.ps_instance + '_SAMLart', samlArt, { path: '/' });
+					$cookies.put(system.ps_instance + '_AuthContext', samlArt, { path: '/' });
+
+					window.location = "loader.html";
+					//window.history.back();
+
+				}, function (data) {
+					console.log('FAILED TO GET SAML ARTIFACT:' + data.data);
+					$scope.errMessage = 'Invalid username or password';
+				})
+			}
+
+		}]);
+
+		// These directives include navigation and footer elements
+		app.directive('myFooter', function () {
+			return {
+				restrict: 'E',
+				templateUrl: 'incl/foot.html'
+			};
+		});
+
+		app.directive('myNavigation', function () {
+			return {
+				restrict: 'E',
+				scope: true,
+				replace: true,
+				templateUrl: 'incl/nav.html',
+				link: function (scope, elem, attrs) {
+					scope.attr = attrs;
+				}
+			};
+		});
+
+
+	</script>
+</body>
+
+</html>

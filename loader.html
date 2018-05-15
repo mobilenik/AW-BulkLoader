@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title></title>
+
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<link rel="stylesheet" href="css/font-awesome.min.css">
+	<link rel="stylesheet" href="css/bootstrap.css">
+	<link rel="stylesheet" href="css/custom.css">
+	<script src="js/jquery.min.js"></script>
+	<script src="js/tether.min.js"></script>
+	<script src="js/bootstrap.min.js"></script>
+	<script src="js/angular.min.js"></script>
+	<script src="js/xml2json.min.js"></script>
+	<script src="js/angular-cookies.min.js"></script>
+	<script src="js/angular-sanitize.min.js"></script>
+	<script src="js/papaparse.min.js"></script>
+	<script src="js/xlsx.min.js"></script>
+	<script src="js/filesaver.min.js"></script>
+
+	<!-- import configuration file -->
+	<script src="config/config.js"></script>
+
+</head>
+
+<body ng-app="loaderApp" ng-controller='loaderController'>
+
+	<my-navigation cookie="{{cookieExists}}"></my-navigation>
+
+	<!-- Main jumbotron -->
+	<br/>
+	<div ng-if="!fileName" class="container">
+		<div class="jumbotron jumbotron-small ot-text-color-navy d-none d-md-block ot-color-cloud text-justify">
+			<h3 ng-model="givenName" display6 ng-bind="getWelcome()">
+				</h2>
+				<p ng-bind="application.desc_long"></p>
+		</div>
+		<div class="jumbotron jumbotron-small ot-text-color-navy d-sm-block d-md-none ot-color-cloud text-justify">
+			<p ng-bind="application.desc_long"></p>
+		</div>
+	</div>
+
+	<!-- CSV Upload tool -->
+	<div class="row">
+		<div class="col-sm-1 col-md-2 col-lg-2"></div>
+		<div class="col-sm-10 col-md-8 col-lg-8">
+			<input type="file" file-name="fileName" excel-data="excelData" entities="entities" is-valid="isValid" error="error" project-name="projectName"
+			 entity-count-peer="entityCountPeer" entity-count-child="entityCountChild" entity-type-count="entityTypeCount" style="width:80%"
+			/>
+			<span ng-if="working" class="fa fa-spinner fa-pulse fa-2x fa-fw pull-right ot-text-color-navy"></span>
+			<button ng-if="run && !working" type="button" ng-click="exportResults()" class="btn btn-sm btn-primary pull-right ml-3" title="Download Results">
+				<span class="fa fa-download fa-inverse"></span>
+			</button>
+			<button ng-if="isValid && !working" type="button" class="btn btn-sm btn-primary pull-right ml-3" title="Create missing entities"
+			 ng-click="run()">
+				<span class="fa fa-play fa-inverse"></span>
+			</button>
+			<button ng-if="isValid && !working" type="button" class="btn btn-sm btn-primary pull-right ml-3" title="Validate spreadsheet"
+			 ng-click="check()">
+				<span class="fa fa-check fa-inverse"></span>
+			</button>
+
+
+			<br/>
+			<hr/>
+			<div ng-if="logging.level=='DEBUG'">Entities to process: {{entityCountPeer}} Peer, {{entityCountChild}} Child - {{callsMade}} Calls made [{{callsSucceeded}} succeeded/{{callsFailed}} failed]</div>
+			<div ng-if="working">
+				<div class="progress">
+					<div class="progress-bar progress-bar-striped progress-bar-animated bg-ot-indigo" role="progressbar" ng-attr-style="width:{{getProgress()}}%"
+					 aria-valuenow="{{getProgress()}}" aria-valuemin="0" aria-valuemax="100"></div>
+				</div>
+				<div class="progress">
+					<div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" ng-attr-style="width:{{getCallProgressOK()}}%"
+					 aria-valuenow="{{getCallProgressOK()}}" aria-valuemin="0" aria-valuemax="100"></div>
+					 <div class="progress-bar progress-bar-striped progress-bar-animated bg-danger" role="progressbar" ng-attr-style="width:{{getCallProgressErr()}}%"
+					 aria-valuenow="{{getCallProgressErr()}}" aria-valuemin="0" aria-valuemax="100"></div>
+				</div>
+			</div>
+			<div ng-if="ran&&!working">
+				<div class="progress">
+					<div class="progress-bar bg-ot-indigo" role="progressbar" ng-attr-style="width:{{getProgress()}}%"
+					 aria-valuenow="{{getProgress()}}" aria-valuemin="0" aria-valuemax="100"></div>
+				</div>
+				<div class="progress">
+					<div class="progress-bar bg-success" role="progressbar" ng-attr-style="width:{{getCallProgressOK()}}%"
+					 aria-valuenow="{{getCallProgressOK()}}" aria-valuemin="0" aria-valuemax="100"></div>
+					 <div class="progress-bar bg-danger" role="progressbar" ng-attr-style="width:{{getCallProgressErr()}}%"
+					 aria-valuenow="{{getCallProgressErr()}}" aria-valuemin="0" aria-valuemax="100"></div>
+				</div>
+			</div>
+			<div ng-if="ran">
+				<div ng-if="itemsUnprocessed > 0" class="small">There were {{itemsUnprocessed}} unprocessed items - probably due to missing relations. Try running the process again.</div>
+				<div class="small">You can hover the mouse over individual entities to see more details about any errors encountered, as well as click an
+					entity to edit the information before running the utility again.  Most Connection errors just require a second run.</div>
+				<div class="small">You can also download the results of this run so that you can correct any data errors and re-load it.</div>
+				<hr/>
+			</div>
+			<div ng-if="isValid" class="content">
+				<div ng-repeat="entity in excelData">
+					<div class="bg-ot-indigo text-white pl-2 mt-3 entity-title">{{entity.entityName}} instances to create:</div>
+					<div class="scrollme">
+						<div class="table-responsive">
+							<table id="entities" class="table table-hover table-bordered table-sm small">
+								<thead class="bg-ot-steel text-white">
+									<th ng-repeat="(column,value) in entity.entities[0]" ng-hide="$last" class="font-light" ng-bind="column">
+									</th>
+								</thead>
+								<tbody>
+									<tr ng-repeat="instance in entity.entities track by $index" ng-class="getRowCSS(instance['Result*'])" title="{{instance['Result*']}}">
+										<!--ng-click="clickEntity(entity.entityName,$index)"-->
+										<td ng-repeat="(column,value) in instance" ng-hide="$last" ng-bind-html="renderCell(value)" ng-class="getColCSS(column,value)"
+										 ng-click="editCell(entity.entityName,instance['Id*'],column,value)">
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div ng-if="!isValid" class="content">
+				<div class="text-danger">{{error}}</div>
+			</div>
+		</div>
+		<div class="col-sm-1 col-md-2 col-lg-2"></div>
+	</div>
+
+	<my-footer></my-footer>
+
+</body>
+
+<script>
+
+	var app = angular.module('loaderApp', ['ngCookies', 'ngSanitize']);
+
+	/* Controllers */
+	app.controller("loaderController", ['$window', '$cookies', '$scope', '$http', '$interval', function ($window, $cookies, $scope, $http, $interval) {
+
+
+		// Check for SAMLArt cookie when page loads
+		$scope.cookieExists = false;
+		if (!angular.isUndefined($cookies.get(system.ps_instance + '_SAMLart'))) {
+			console.log('COOKIE FOUND');
+			$scope.cookieExists = true;
+		} else {
+			window.location = 'login.html';
+		}
+
+		$scope.validate = true;
+		$scope.working = false;
+		$scope.mode = 'Validate';
+		$scope.ran = false;
+		$scope.iterations = 0;
+		$scope.itemsUnprocessed = 0;
+
+		// Read application settings
+		$scope.application = application;
+		document.title = $scope.application.title;
+		//Read log settings
+		$scope.logging = logging;
+
+		// Local variables to hold session info
+		var samlArt = $cookies.get(system.ps_instance + '_SAMLart')
+
+		$scope.editCell = function (entName, entIdx, col, val) {
+			newValue = prompt('Edit cell value', val);
+			if (newValue == null || newValue == "") {
+				newValue = val;
+			}
+			$scope.excelData[entName].entities[entIdx - 1][col] = newValue;
+		}
+
+		$scope.run = function () {
+			$scope.callsMade = 0;
+			$scope.callsSucceeded = 0;
+			$scope.callsFailed = 0;
+			$scope.validate = false;
+			$scope.mode = 'Execute';
+			//$scope.progress = 0;
+			processEntities(100);
+		}
+
+		$scope.check = function () {
+			$scope.callsMade = 0;
+			$scope.callsSucceeded = 0;
+			$scope.callsFailed = 0;
+			$scope.validate = true;
+			$scope.mode = 'Validate';
+			//$scope.progress = 0;
+			processEntities(100);
+		}
+
+		function processEntities(interval) {
+			$scope.working = true;
+			$scope.itemsUnprocessed = 0;
+			$scope.entityIndex = 0;
+			$scope.entityRelationIndex = 0;
+			$interval(processEntity, interval, Object.keys($scope.excelData).length + 1)
+		}
+
+		function processEntity() {
+			if ($scope.entityIndex < Object.keys($scope.excelData).length) {
+				var entity = $scope.excelData[Object.keys($scope.excelData)[$scope.entityIndex]];
+				for (i = 0; i < entity.entities.length; i++) {
+					if (entity.entityName.indexOf('_child') == -1) { // Skip child entities - they are processed as part of the parent
+						writeLog('DEBUG', $scope.mode + ': Creating ' + entity.entities.length + ' ' + entity.entityName + ' instances');
+						createEntity(entity.entityName, i + 1);
+					} else {
+						if ($scope.validate) { writeLog('DEBUG', 'Validate: skipped child entity ' + entity.entityName + ':' + i) };
+					}
+				}
+				$scope.entityIndex++;// = $scope.entityIndex + 1;
+			} else { // Kick off the relation processing
+				writeLog('DEBUG', $scope.mode + ': Waiting for entity calls to complete before going to create relations');
+				var startTime = new Date();
+				var timeDiff = 0;
+				while ($scope.callsMade == 0 || ($scope.callsMade > $scope.callsSucceeded + $scope.callsFailed && timeDiff < 60)) {
+					timeDiff = (new Date() - startTime) / 1000; // time spent in seconds
+				}
+				writeLog('DEBUG', $scope.mode + ': All calls completed, creating relations now');
+				var interval = ($scope.mode == "Validate") ? 50 : 50
+				$interval(processEntityRelations, interval, Object.keys($scope.excelData).length + 1)
+			}
+		}
+
+		function processEntityRelations() {
+			if ($scope.entityRelationIndex < Object.keys($scope.excelData).length) {
+				var entity = $scope.excelData[Object.keys($scope.excelData)[$scope.entityRelationIndex]]; // Get next entity sheet
+				writeLog('DEBUG', $scope.mode + ': Processing relations for ' + entity.entityName);
+				for (e = 0; e < entity.entities.length; e++) {
+					var result = entity.entities[e]['Result*'];
+					if (result.startsWith('Created:') || result.startsWith('Valid')) { // If the entity has been created then continue
+						angular.forEach(entity.entities[e], function (value, property) { // Loop properties for relations
+							if (property.indexOf('_peer') > 0 || property.indexOf('_child') > 0) { // If it is a relation property
+								var relName = property.substring(0, property.indexOf('_'));
+								var relType = property.substring(property.indexOf('_') + 1);
+								if (value.indexOf('[') == 0) { // If it has multiple values, split into an array
+									var relations = value.substring(1, value.length - 1).split(',');
+									for (k = 0; k < relations.length; k++) { // Now loop each one
+										var relation = relations[k];
+										// Now create the relation if it has not already been created - to support re-tries
+										if (relType == 'peer') { // If it is a peer relation
+											if (relation.indexOf('Created') == -1) createRelationPeerMulti(entity.entityName, e + 1, relName, relType, relation);
+										} else { // it is a child - and the relation name is the same as the entity name so it is not needed
+											if (relation.indexOf('Created') == -1) createRelationChild(entity.entityName, e + 1, relName, relType, relation);
+										}
+									}
+								} else { // It only has one value - always peer
+									if (property.indexOf('_peer') && value != '') { // Double-check it is a peer and if it has been processed already
+										if (value.indexOf('Created') == -1) createRelationPeerSingle(entity.entityName, e + 1, relName, relType, value);
+									}
+								}
+							}
+						})
+					} else {
+						writeLog('DEBUG', $scope.mode + ': Skipping relations from ' + entity.entityName);
+					}
+				}
+				$scope.entityRelationIndex++;
+
+			} else {
+				writeLog('DEBUG', 'Waiting for relation calls to complete');
+				var startTime = new Date();
+				var timeDiff = 0;
+				writeLog('DEBUG', 'callsMade:' + $scope.callsMade);
+				while ($scope.callsMade > ($scope.callsSucceeded + $scope.callsFailed) && timeDiff < 60) {
+					timeDiff = (new Date() - startTime) / 1000; // time spent in seconds
+				}
+				writeLog('DEBUG', 'All relations processed');
+				$scope.working = false;
+				$scope.ran = true;
+			}
+		}
+
+		function createEntity(entityName, entityIndex) {
+			$scope.callsMade++;
+			var instance = getEntityInfo(entityName, entityIndex);
+			if (!instance.exists) {
+				if (!$scope.validate) {
+					var oper = 'oper:Create' + entityName + '>';
+					var ent = 'ent:' + entityName + '-create>';
+					var properties = buildEntityPropXML($scope.excelData[entityName].entities[instance.index], entityName);
+					if (properties.startsWith('<') || properties == 'create_without_properties') {
+						var ns = 'http://schemas/' + $scope.projectName + '/' + entityName;
+						$http({
+							method: 'POST',
+							data: '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:oper="' + ns + '/operations" xmlns:ent="' + ns + '"><soapenv:Header/><soapenv:Body><' + oper + '<' + ent + properties + '</' + ent + '</' + oper + '</soapenv:Body></soapenv:Envelope>',
+							dataType: 'xml',
+							contentType: 'application/xml; charset=utf-8',
+							url: system.base_url + '/home/' + system.ps_org + '/com.eibus.web.soap.Gateway.wcp?organization=o=' + system.ps_org + ',cn=cordys,cn=' + system.ps_instance + ',o=' + system.ps_domain,
+							headers: { 'SAMLart': samlArt },
+						}).then(function (data) {
+							$scope.callsSucceeded++;
+							$scope.progress++;
+							var x2js = new X2JS();
+							var jsonObjEntity = x2js.xml_str2json(data.data).Envelope.Body['Create' + entityName + 'Response'][entityName];
+							for (var key in jsonObjEntity) {
+								if (jsonObjEntity.hasOwnProperty(key)) {
+									if (/[\w]+-id/.test(key)) {
+										if (jsonObjEntity[key].hasOwnProperty('ItemId')) {
+											$scope.excelData[entityName].entities[instance.index]['Result*'] = 'Created:' + key + ':' + jsonObjEntity[key].ItemId;
+											return true;
+										}
+									}
+								}
+							}
+							return false;
+						}, function (data) {
+							$scope.callsFailed++;
+							var fault = extractError(data);
+							writeLog('DEBUG', 'Failed creating entity' + entityName + ':' + entityIndex + ' - ' + fault);
+							$scope.excelData[entityName].entities[instance.index]['Result*'] = 'Error:' + fault;
+							return false
+						})// POST
+					} else { // TBD WHAT IS THIS ???  GINO ???
+						$scope.excelData[entityName].entities[instance.index]['Result*'] = properties;
+					}
+				} else { // Validation mode
+					$scope.callsSucceeded++;
+					$scope.excelData[entityName].entities[instance.index]['Result*'] = 'Valid';
+					writeLog('DEBUG', $scope.mode + ': Tested creation of entity ' + entityName + ':' + entityIndex);
+				}
+			} else {
+				$scope.callsSucceeded++;
+				writeLog('DEBUG', $scope.mode + ': Skipping creation of entity ' + entityName + ':' + entityIndex + ' as it exists already');
+			}
+		}
+
+		function createRelationPeerSingle(parentName, parentIndex, relName, relType, relValue) {
+			var related = getRelationInfo(relValue, relName, relType);
+			var parent = getEntityInfo(parentName, parentIndex);
+			$scope.callsMade++;
+			if (related.error == '') {
+				if (related.exists) {
+					if (!$scope.validate) {
+						var xml = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>';
+						xml = xml + '<Set' + relName + ' xmlns="http://schemas/' + $scope.projectName + '/' + parentName + '/operations">';
+						xml = xml + '<entA:' + parent.idProperty + ' xmlns:entA="http://schemas/' + $scope.projectName + '/' + parentName + '">';
+						xml = xml + '<entA:Id>' + parent.id + '</entA:Id>';
+						xml = xml + '</entA:' + parent.idProperty + '>';
+						xml = xml + '<entA:' + relName + ' xmlns:entA="http://schemas/' + $scope.projectName + '/' + parentName + '">';
+						xml = xml + '<entB:' + related.idProperty + ' xmlns:entB="http://schemas/' + $scope.projectName + '/' + related.name + '">';
+						xml = xml + '<entB:Id>' + related.id + '</entB:Id>';
+						xml = xml + '</entB:' + related.idProperty + '></entA:' + relName + '></Set' + relName + '></soap:Body></soap:Envelope>';
+						//console.log(xml);
+						$http({
+							method: 'POST',
+							data: xml,
+							dataType: 'xml',
+							contentType: 'application/xml; charset=utf-8',
+							url: system.base_url + '/home/' + system.ps_org + '/com.eibus.web.soap.Gateway.wcp?organization=o=' + system.ps_org + ',cn=cordys,cn=' + system.ps_instance + ',o=' + system.ps_domain,
+							headers: { 'SAMLart': samlArt },
+						}).then(function (data) {
+							$scope.callsSucceeded++;
+							setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Created');
+							return true;
+						}, function (data) {
+							$scope.callsFailed++;
+							var fault = extractError(data);
+							writeLog('DEBUG', $scope.mode + ': Failed to create single peer relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index + ' - ' + fault);
+							setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Err-' + fault);
+							if (fault.indexOf('exists') > 0) { // TBD IS THIS DOING ANYTHING??  DOES IT IDENTIFY AN EXISTING RELATION?
+								return true; // Existing relation is OK
+							} else {
+								return false;
+							}
+						})// POST completion
+					} else { // Validate mode
+						$scope.callsSucceeded++;
+						setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Valid');
+						writeLog('DEBUG',$scope.mode + ': Tested single peer relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index);
+					}
+				} else { // Relation did not exist
+					if (!$scope.validate) { // Only a problem in execution mode
+						setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Err-relation missing');
+						writeLog('DEBUG', $scope.mode + ': Relationship from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index + ' - has missing target');
+						$scope.callsFailed++;
+					} else { // In validation mode this is a pass
+						setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Valid');
+						writeLog('DEBUG',$scope.mode + ': Tested single peer relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index);
+						$scope.callsSucceeded++;
+					}
+				}
+			} else {
+				setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Err-' + related.error);
+				writeLog('DEBUG', $scope.mode + ': Relation error: ' + related.error + ' for single peer relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index);
+				$scope.callsFailed++;
+			}
+		}
+
+		function createRelationPeerMulti(parentName, parentIndex, relName, relType, relValue) {
+			var related = getRelationInfo(relValue, relName, relType);
+			var parent = getEntityInfo(parentName, parentIndex);
+			$scope.callsMade++;
+			if (related.error == '') { // Error means wrong entity name or index value
+				if (related.exists) { // Exists means there is an ItemId
+					if (!$scope.validate) {
+
+						var xml = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>';
+						xml = xml + '<AddTo' + relName + ' xmlns="http://schemas/' + $scope.projectName + '/' + parentName + '/operations">';
+						xml = xml + '<entA:' + parent.idProperty + ' xmlns:entA="http://schemas/' + $scope.projectName + '/' + parentName + '">';
+						xml = xml + '<entA:Id>' + parent.id + '</entA:Id>';
+						xml = xml + '</entA:' + parent.idProperty + '>';
+						xml = xml + '<entA:' + relName + ' xmlns:entA="http://schemas/' + $scope.projectName + '/' + parentName + '">';
+						xml = xml + '<entB:' + related.idProperty + ' xmlns:entB="http://schemas/' + $scope.projectName + '/' + related.name + '">';
+						xml = xml + '<entB:Id>' + related.id + '</entB:Id></entB:' + related.idProperty + '>';
+						xml = xml + '</entA:' + relName + '></AddTo' + relName + '></soap:Body></soap:Envelope>';
+						//console.log(xml);
+						$http({
+							method: 'POST',
+							data: xml,
+							dataType: 'xml',
+							contentType: 'application/xml; charset=utf-8',
+							url: system.base_url + '/home/' + system.ps_org + '/com.eibus.web.soap.Gateway.wcp?organization=o=' + system.ps_org + ',cn=cordys,cn=' + system.ps_instance + ',o=' + system.ps_domain,
+							headers: { 'SAMLart': samlArt },
+						}).then(function (data) {
+							$scope.callsSucceeded++;
+							setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Created');
+							return true;
+						}, function (data) {
+							$scope.callsFailed++;
+							var fault = extractError(data);
+							writeLog('DEBUG', $scope.mode + ': Failed to create multi peer relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index + ' - ' + fault);
+							setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Err-' + fault);
+							if (fault.indexOf('exists') > 0) {
+								return true; // Existing relation is OK
+							} else {
+								return false;
+							}
+						})// POST completion
+					} else { // Validation mode - OK
+						setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Valid');
+						//writeLog('DEBUG',$scope.mode + ': Tested multi peer relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index);
+						$scope.callsSucceeded++;
+					}
+				} else { // Relation did not exist
+					if (!$scope.validate) { // Only a problem in execution mode
+						setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Err-relation missing');
+						writeLog('DEBUG', $scope.mode + ':Relation missing: ' + related.error + ' for multi peer relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index);
+						$scope.callsFailed++;
+					} else { // In validation mode this is a pass
+						setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Valid');
+						//writeLog('DEBUG',$scope.mode + ': Tested multi peer relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index);
+						$scope.callsSucceeded++;
+					}
+				}
+			} else { // Relation error (name or index) - applies regardless of mode
+				setRelationFlag(parentName, parentIndex, relName + '_peer', related.name + ':' + related.index, related.originalValue, 'Err-' + related.error);
+				writeLog('DEBUG', $scope.mode + ': Relation error: ' + related.error + ' for multi peer relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index);
+				$scope.callsFailed++;
+			}
+		}
+
+
+		function createRelationChild(parentName, parentIndex, relName, relType, relValue) {
+			var related = getRelationInfo(relValue, relName + '_child', relType);
+			var parent = getEntityInfo(parentName, parentIndex);
+			$scope.callsMade++;
+			if (related.error == '') {
+				if (!$scope.validate) {
+					var xml = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>';
+					xml = xml + '<Create' + related.name + ' xmlns="http://schemas/' + $scope.projectName + '/' + parentName + '/operations">';
+					xml = xml + '<entA:' + parent.idProperty + ' xmlns:entA="http://schemas/' + $scope.projectName + '/' + parentName + '">';
+					xml = xml + '<entA:Id>' + parent.id + '</entA:Id>';
+					xml = xml + '</entA:' + parent.idProperty + '>';
+					xml = xml + '<ent:' + related.name + '-create xmlns:ent="http://schemas/' + $scope.projectName + '/' + parentName + '.' + related.name + '">';
+					var propXML = buildEntityPropXML($scope.excelData[related.name + '_child'].entities[related.index - 1], related.name);
+					//console.log(propXML);
+					xml = xml + propXML;
+					xml = xml + '</ent:' + related.name + '-create>';
+					xml = xml + '</Create' + related.name + '></soap:Body></soap:Envelope>';
+					//console.log(xml);
+					$http({
+						method: 'POST',
+						data: xml,
+						dataType: 'xml',
+						contentType: 'application/xml; charset=utf-8',
+						url: system.base_url + '/home/' + system.ps_org + '/com.eibus.web.soap.Gateway.wcp?organization=o=' + system.ps_org + ',cn=cordys,cn=' + system.ps_instance + ',o=' + system.ps_domain,
+						headers: { 'SAMLart': samlArt },
+					}).then(function (data) {
+						$scope.callsSucceeded++;
+						var x2js = new X2JS();
+						var jsonObj = x2js.xml_str2json(data.data);
+						var newId = jsonObj.Envelope.Body['Create' + related.name + 'Response'][related.name][related.idProperty].ItemId;
+						$scope.excelData[related.name + '_child'].entities[related.index - 1]['Result*'] = 'Created:' + newId;
+						setRelationFlag(parentName, parentIndex, related.name + '_child', related.name + ':' + related.index, related.originalValue, 'Created');
+						return true;
+					}, function (data) {
+						$scope.callsFailed++;
+						var fault = extractError(data);
+						$scope.excelData[related.name + '_child'].entities[related.index - 1]['Result*'] = 'Error:' + fault; // Update the child entity record
+						setRelationFlag(parentName, parentIndex, related.name + '_child', related.name + ':' + related.index, related.originalValue, 'Err'); // Update the parent's flag
+						writeLog('DEBUG', $scope.mode + ': Failed to create child relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index + ' - ' + fault);
+						if (fault.indexOf('exists') > 0) {
+							return true;// Existing relation is OK
+							// THIS SHOULD NOT EVER RUN
+						} else {
+							return false;
+						}
+					})// POST completion
+				} else { // Validation mode - OK
+					//$scope.excelData[related.name + '_child'].entities[related.index - 1]['Result*'] = 'Tested:OK';
+					setRelationFlag(parentName, parentIndex, related.name + '_child', related.name + ':' + related.index, related.originalValue, 'Valid');
+					//writeLog('DEBUG',$scope.mode + ': Tested child relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index);
+					$scope.callsSucceeded++;
+				}
+			} else {
+				setRelationFlag(parentName, parentIndex, relName + '_child', related.name + ':' + related.index, related.originalValue, 'Err-' + related.error);
+				writeLog('DEBUG', $scope.mode + ': ' + related.error + ' for child relation from ' + parentName + ':' + parentIndex + ' to ' + related.name + ':' + related.index);
+				$scope.callsFailed++;
+			}
+		}
+
+		function setRelationFlag(parentName, parentIndex, relationName, relationValue, oldValue, flag) {
+			var oldString = $scope.excelData[parentName].entities[parentIndex - 1][relationName];
+			var newString = '';
+			if (flag == '') {
+				newString = oldString.replace(oldValue, relationValue);
+			} else {
+				newString = oldString.replace(oldValue, relationValue + ':' + flag);
+			}
+			$scope.excelData[parentName].entities[parentIndex - 1][relationName] = newString;
+		}
+
+		function getEntityInfo(entName, entIndex) {
+			var entResult = $scope.excelData[entName].entities[entIndex - 1]['Result*'];
+			var exist = entResult.indexOf('Created:') > -1 ? true : false;
+			var entIdKey;
+			var entIdValue;
+			if (exist) {
+				var entIdKey = entResult.substring(entResult.indexOf(':') + 1, entResult.lastIndexOf(':'));
+				var entItemIdValue = entResult.substring(entResult.lastIndexOf(':') + 1);
+				var entIdValue = entItemIdValue.substring(33); // Removes entity prefix
+			}
+			return { idProperty: entIdKey, id: entIdValue, itemId: entItemIdValue, exists: exist, index: entIndex - 1 }; // index in array is 1 less than the id of the entity
+		}
+
+		function getRelationInfo(relValue, relName, relType) {
+			var err = '';
+			var oldValue = relValue;
+			if (relValue.indexOf(':OK')>-1 || relValue.indexOf(':Err')>-1 || relValue.indexOf(':Valid')>-1) relValue = relValue.substring(0, relValue.lastIndexOf(':')); // Remove the flag
+			var relatedName = relValue.substring(0, relValue.indexOf(':'));
+			var relatedIndex = relValue.substring(relValue.indexOf(':') + 1);
+			var actualRelName; // child entity name is different
+			relType == 'peer' ? actualRelName = relatedName : actualRelName = relatedName + '_child';
+
+			if ($scope.excelData.hasOwnProperty(actualRelName)) { // Test for an accurate related entity name
+				if (relatedIndex <= $scope.excelData[actualRelName].entities.length) {
+					relatedResult = $scope.excelData[actualRelName].entities[relatedIndex - 1]['Result*']
+					var exist = (relatedResult.indexOf('Created:')>-1 || relatedResult.indexOf('Valid')>-1) ? true : false;
+					var relatedIdKey;
+					var relatedIdValue;
+					if (exist) {
+						var relatedIdKey = relatedResult.substring(relatedResult.indexOf(':') + 1, relatedResult.lastIndexOf(':'));
+						var relatedItemIdValue = relatedResult.substring(relatedResult.lastIndexOf(':') + 1);
+						var relatedIdValue = relatedItemIdValue.substring(33); // Removes entity prefix
+					}
+				} else {
+					err = 'index value';
+				}
+			} else {
+				err = 'entity name'
+			}
+
+			return { name: relatedName, index: relatedIndex, idProperty: relatedIdKey, id: relatedIdValue, itemId: relatedItemIdValue, exists: exist, error: err, originalValue: oldValue };
+		}
+
+		function buildEntityPropXML(entity, entityName) {
+			var missingEntities = '';
+			var propertyXML = '';
+			var hasRelationships = false;
+			angular.forEach(entity, function (value, key) {
+				if (!key.endsWith('*') && value != '') {
+					if (key.indexOf('_extId') > 0) { // An external entity ID
+						var id = key.substring(0, key.indexOf('_'));
+						propertyXML = propertyXML + '<ent:' + entityName + '-id-create>';
+						propertyXML = propertyXML + '<ent:' + id + '>' + value + '</ent:' + id + '>';
+						propertyXML = propertyXML + '</ent:' + entityName + '-id-create>';
+					} else if (key == 'Title') { // Title property
+						propertyXML = propertyXML + '<title:Title-create xmlns:title="http://schemas.opentext.com/entitymodelling/buildingblocks/title/1.0"><title:Value>' + value + '</title:Value></title:Title-create>';
+					} else if (key.indexOf('_peer') == -1 && key.indexOf('_child') == -1) { // Normal property
+						propertyXML = propertyXML + '<ent:' + key + '>' + value + '</ent:' + key + '>';
+					} else if (key.indexOf('_peer') > -1 || key.indexOf('_child') > -1) {
+						hasRelationships = true;
+					}
+				}
+			});
+
+			if (propertyXML == '' && hasRelationships) {
+				propertyXML = 'create_without_properties';
+			}
+
+			return propertyXML;
+		}
+
+		function writeLog(logLevel, logMessage) {
+			if ($scope.logging.level == logLevel) console.log(logMessage);
+		}
+
+		function extractError(data) {
+			var fault = data.data.toString();
+			if (fault.indexOf('duplicate key') > 0) {
+				fault = 'Unique entity exists';
+			} else if (fault.indexOf('Could not find definition for Web service') > 0) {
+				fault = 'Missing Web Service';
+			} else if (fault.indexOf('Communication with Web service/application modeled in the activity failed.') > 0) {
+				fault = 'Connection error';
+			} else {
+				var x2js = new X2JS();
+				var jsonObj = x2js.xml_str2json(data.data);
+				if (!angular.isUndefined(jsonObj.Envelope.Body.Fault.detail.FaultRelatedException)) {
+					var faultString = jsonObj.Envelope.Body.Fault.detail.FaultRelatedException.toString();
+					fault = faultString.substring(faultString.indexOf("WebServiceException") + 22, faultString.indexOf("at org") - 1);
+					if (fault.length > 256) { fault = fault.substring(0, 256) + ' ...' }
+				}
+			}
+			return fault;
+		}
+
+		// Click action creates single entity
+		$scope.clickEntity = function (entity, index) {
+			$scope.createEntity(entity, index)
+		}
+
+		$scope.getRowCSS = function (value) {
+			var className = '';
+			if (value.indexOf('Created') == 0 || value.indexOf('Valid') == 0) { className = 'success'; }
+			if (value.startsWith('Relation')) { className = 'skip'; }
+			if (value.startsWith('Error') || value.indexOf('invalid entity') > 0) { className = 'fail'; }
+			return className;
+		}
+
+		$scope.getColCSS = function (col, val) {
+			var className = '';
+			if ((col.indexOf('_peer') > 0 || col.indexOf('_child') > 0) && val.indexOf(':Err') > 0) { className = 'rel-fail'; }
+			return className;
+		}
+
+		$scope.renderCell = function (val) { // Renders multi-relations as a table
+			var res = val;
+			if (val.indexOf('[') == 0) { // Repeating
+				var relations = val.substring(1, val.length - 1).split(',');
+				res = '<div class="container"><div class="row"><div class="clearfix visible-sm" visible-md></div>';
+				for (k = 0; k < relations.length; k++) { // Now loop each one
+					var style = '';
+					var rel = relations[k];
+					if (rel.indexOf(':Err') > 0) {
+						res = res + '<div class="col-lg-4 col-md-4 col-sm-6 rel-fail"><em>' + rel + '</em></div>'; // italic	
+					} else {
+						res = res + '<div class="col-lg-4 col-md-4 col-sm-6">' + rel + '</div>'; // normal font	
+					}
+				}
+				res = res + '</div></div>';
+			} else { // Single
+			}
+			return res;
+		}
+
+		$scope.getProgress = function () {
+			var maxVal = $scope.entityTypeCount * 2 // Two passes of each entity
+			var prog = (($scope.entityIndex + $scope.entityRelationIndex) + 2 / maxVal) * 100; // add 2 because index is 0 based
+			return prog;
+		}
+
+		$scope.getCallProgressOK = function () {
+			return ($scope.callsSucceeded / $scope.callsMade) * 100;
+		}
+
+		$scope.getCallProgressErr = function () {
+			return ($scope.callsFailed / $scope.callsMade) * 100;
+		}
+
+		$scope.exportResults = function () {
+			var wb = XLSX.utils.book_new()
+			angular.forEach($scope.excelData, function (entity, key) {
+				var ws = XLSX.utils.json_to_sheet(entity.entities);
+				XLSX.utils.book_append_sheet(wb, ws, entity.entityName);
+			});
+			var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+			function s2ab(s) {
+				var buf = new ArrayBuffer(s.length);
+				var view = new Uint8Array(buf);
+				for (var x = 0; x != s.length; ++x) view[x] = s.charCodeAt(x) & 0xFF;
+				return buf;
+			}
+			saveAs(new Blob([s2ab(wbout)], { type: 'application/octet-stream' }), "results_" + $scope.fileName);
+		}
+
+	}])
+
+	// These directives include navigation and footer elements
+	app.directive('myFooter', function () {
+		return {
+			restrict: 'E',
+			templateUrl: 'incl/foot.html'
+		};
+	});
+
+	app.directive('myNavigation', function () {
+		return {
+			restrict: 'E',
+			scope: true,
+			replace: true,
+			templateUrl: 'incl/nav.html',
+			link: function (scope, elem, attrs) {
+				scope.attr = attrs;
+			}
+		};
+	});
+
+	app.directive('excelData', function () {
+		return {
+			scope: {
+				excelData: "=",
+				//entities: "=",
+				isValid: "=",
+				error: "=",
+				fileName: "=",
+				projectName: "=",
+				entityCountChild: "=",
+				entityCountPeer: "=",
+				entityTypeCount: "="
+			},
+			link: function (scope, element) {
+				$(element).on('change', function (changeEvent) {
+					var files = changeEvent.target.files;
+					var countChild = 0;
+					var countPeer = 0;
+					//var namespaces = {};
+					if (files.length) {
+						if (files[0].name.indexOf("_") < 0) {
+							console.log("wrong filename");
+							scope.$apply(function () {
+								scope.error = "Filename should be in the format <projectname>_<filename>.  The project name can be found in the schema reference when you add a web service to an entity."
+								scope.isValid = false;
+							});
+						} else {
+							var reader = new FileReader();
+
+							reader.onload = function (e) {
+								scope.$apply(function () {
+									var contents = e.target.result;
+									var result = {};
+
+									/* read workbook */
+									var wb = XLSX.read(contents, { type: 'binary' });
+									scope.entityTypeCount = wb.SheetNames.length;
+
+									for (var s = 0; s < wb.SheetNames.length; ++s) {
+										var wsname = wb.SheetNames[s];
+
+										if (wsname != "Intro") {
+											var ws = wb.Sheets[wsname];
+
+											/* grab first row and generate column headers */
+											var sheet = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+
+											//generate rest of the data 
+											var data = [];
+											for (var t = 1; t < sheet.length; ++t) {
+												data[t - 1] = {};
+												if (wsname.endsWith("_child")) {
+													countChild++;
+												} else {
+													countPeer++;
+												};
+												for (u = 0; u < sheet[t].length; ++u) {
+													if (sheet[t][u] == null) continue;
+													data[t - 1][sheet[0][u]] = sheet[t][u]
+												}
+												//data[r - 1]["Status*"] = "0";
+												var existingValue = data[t - 1]["Result*"];
+												if (existingValue.startsWith('Error') || existingValue.startsWith('Valid')) {
+													data[t - 1]["Result*"] = ""; // Clear old errors, just leave created references
+												}
+											}
+											result[wsname] = { entityName: wsname, entities: data };
+										}
+									}
+									console.log(countPeer + " peer and " + countChild + " child entities read");
+
+									scope.isValid = true;
+									scope.excelData = result;
+									scope.error = "";
+									scope.fileName = files[0].name;
+									scope.entityCountPeer = countPeer;
+									scope.entityCountChild = countChild;
+									if (scope.fileName.startsWith('results_')) {
+										scope.fileName = scope.fileName.substring(8);
+									}
+									scope.projectName = scope.fileName.substring(0, scope.fileName.indexOf("_"));
+									console.log(scope.fileName + ':' + scope.projectName);
+								});
+
+							}
+							reader.readAsBinaryString(files[0]);
+						}
+					}//if there is a file
+				}); //element change event
+			} //main function
+		}; //directive return
+	});//directive
+
+
+	app.directive('exportToCsv', function () {
+		return {
+			restrict: 'A',
+			link: function (scope, element, attrs) {
+				var el = element[0];
+				element.bind('click', function (e) {
+					var table = document.querySelector('#entities');
+					var csvString = '';
+					for (var c = 0; c < table.rows.length; c++) {
+						var rowData = table.rows[c].cells;
+						for (var d = 0; d < rowData.length; d++) {
+							csvString = csvString + rowData[d].lastElementChild.innerHTML + ",";
+						}
+						csvString = csvString.substring(0, csvString.length - 1);
+						csvString = csvString + "\n";
+					}
+					csvString = csvString.substring(0, csvString.length - 1);
+					var a = $('<a/>', {
+						style: 'display:none',
+						href: 'data:application/octet-stream;base64,' + btoa(csvString),
+						download: 'emailStatistics.csv'
+					}).appendTo('body')
+					a[0].click()
+					a.remove();
+				});
+			}
+		}
+	});
+
+</script>
+
+</html>
